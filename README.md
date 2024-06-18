@@ -3,6 +3,9 @@ Support in Delphi for WebP and Heif image codecs with a wrapper for the DLLs.
 
 These units add two new `TGraphic` class types called `THeifImage` and `TWebPImage` respectively. They work as any other TGraphic with support for editing images, assigning to other image types and you can edit the pixels individually by any of the avalabile channels with the `TRGBAPixel` helper provided in `Cod.Imaging.Utils`.
 
+### Planned features
+- Ability to save Heif image to TStream (currently not avalabile due to dll callback complications)
+
 ## Examples
 ```
   var Image: THeifImage;
