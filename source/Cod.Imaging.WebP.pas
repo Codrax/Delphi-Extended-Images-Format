@@ -181,17 +181,19 @@ begin
   // Free memory
   FreeData;
 
-  // Read settings
-  FWidth := Source.FWidth;
-  FHeight := Source.FHeight;
-  FChannelNumber := Source.FChannelNumber;
-  FQuality := Source.FQuality;
+  if not Source.Empty then begin
+    // Read settings
+    FWidth := Source.FWidth;
+    FHeight := Source.FHeight;
+    FChannelNumber := Source.FChannelNumber;
+    FQuality := Source.FQuality;
 
-  // Clone memory
-  MemSize := Source.ArraySize;
-  FData := AllocMem( MemSize );
-  Move(Source.FData^, FData^, MemSize);
-  FLibMem := false;
+    // Clone memory
+    MemSize := Source.ArraySize;
+    FData := AllocMem( MemSize );
+    Move(Source.FData^, FData^, MemSize);
+    FLibMem := false;
+  end;
 end;
 
 constructor TWebPImage.Create;
@@ -252,6 +254,9 @@ begin
   if not GetEmpty then
     FreeByteMemory(FData, FLibMem);
   FData := nil;
+  FWidth := 0;
+  FHeight := 0;
+  FLibMem := false;
 end;
 
 function TWebPImage.GetEmpty: Boolean;

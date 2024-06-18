@@ -104,6 +104,18 @@ interface
 
 implementation
 
+procedure MoveFlipPixels(Source, Dest: PByte; Size: Integer);
+var
+  Divider: integer;
+begin
+  Divider := Size div 3;
+  for var I := 0 to Divider-1 do begin
+    Dest[I*3] := Source[I*3+2];
+    Dest[I*3+1] := Source[I*3+1];
+    Dest[I*3+2] := Source[I*3];
+  end;
+end;
+
 { THeifImage }
 
 function THeifImage.ArraySize: cardinal;
@@ -126,7 +138,7 @@ begin
     try
       // Create
       Bit.Assign(Source);
-      Bit.PixelFormat := pf32bit;
+      Bit.PixelFormat := pf24bit;
       Bit.Transparent := true;
       Bit.TransparentMode := tmAuto;
       Bit.SupportsPartialTransparency;
@@ -135,20 +147,21 @@ begin
       FreeData;
 
       // Allocate new image
-      heif_image_create(Bit.Width, Bit.Height, THeifColorspace.colorspace_RGB, THeifChroma.chroma_interleaved_RGB, FImage).ErrRaise;
-
-
+      ReallocateNew(Bit.Width, Bit.Height);
 
       // Read
       DestPtr := FData;
-      BytesPerScanLine := Bit.Width * 4;
+      BytesPerScanLine := Bit.Width * 3;
 
       // Copy picture lines
       for Y := 0 to Bit.Height - 1 do begin
         SrcPtr := Bit.ScanLine[Y];
 
-        Move(SrcPtr^, DestPtr^, BytesPerScanLine); // Copy the entire scanline
-        Inc(DestPtr, BytesPerScanLine); // Move to the next scanline in the source data
+        // Copy
+        MoveFlipPixels(SrcPtr, DestPtr, BytesPerScanLine);
+
+        // Inc pos
+        Inc(DestPtr, BytesPerScanLine);
       end;
     finally
       Bit.Free;
@@ -182,11 +195,13 @@ begin
   // Free memory
   FreeData;
 
-  // Read settings
-  ReallocateNew(Source.Width, Source.Height);
+  if not Source.Empty then begin
+    // Read settings
+    ReallocateNew(Source.Width, Source.Height);
 
-  // Copy memory
-  Move(Source.FData^, FData^, ArraySize);
+    // Copy memory
+    Move(Source.FData^, FData^, ArraySize);
+  end;
 end;
 
 constructor THeifImage.Create;
@@ -445,18 +460,6 @@ begin
     //Stream.Write( Output^, Size );
   finally
     heif_context_free( ctx );
-  end;
-end;
-
-procedure MoveFlipPixels(Source, Dest: PByte; Size: Integer);
-var
-  Divider: integer;
-begin
-  Divider := Size div 3;
-  for var I := 0 to Divider-1 do begin
-    Dest[I*3] := Source[I*3+2];
-    Dest[I*3+1] := Source[I*3+1];
-    Dest[I*3+2] := Source[I*3];
   end;
 end;
 
