@@ -20,6 +20,7 @@ uses
     THeifReadingOptions = type Pointer; // should be set to null for now
     THeifEncodingOptions = type Pointer; // also null
     THeifCompressionFormat = type integer;
+    THeifSuberrorCode = type integer;
 
     // Helper
     THeifChannelHelper = record helper for THeifChannel
@@ -76,47 +77,204 @@ uses
       // Mask image encoding (ISO/IEC 23008-12:2022 Section 6.10.2)
       compression_mask = 0;
     end;
+    THeifSuberrorCodeHelper = record helper for THeifSuberrorCode
+      const
+      // no further information available
+      heif_suberror_Unspecified = 0;
+
+      // --- Invalid_input ---
+      // End of data reached unexpectedly.
+      heif_suberror_End_of_data = 100;
+
+      // Size of box (defined in header) is wrong
+      heif_suberror_Invalid_box_size = 101;
+
+      // Mandatory 'ftyp' box is missing
+      heif_suberror_No_ftyp_box = 102;
+      heif_suberror_No_idat_box = 103;
+      heif_suberror_No_meta_box = 104;
+      heif_suberror_No_hdlr_box = 105;
+      heif_suberror_No_hvcC_box = 106;
+      heif_suberror_No_pitm_box = 107;
+      heif_suberror_No_ipco_box = 108;
+      heif_suberror_No_ipma_box = 109;
+      heif_suberror_No_iloc_box = 110;
+      heif_suberror_No_iinf_box = 111;
+      heif_suberror_No_iprp_box = 112;
+      heif_suberror_No_iref_box = 113;
+      heif_suberror_No_pict_handler = 114;
+
+      // An item property referenced in the 'ipma' box is not existing in the 'ipco' container.
+      heif_suberror_Ipma_box_references_nonexisting_property = 115;
+
+      // No properties have been assigned to an item.
+      heif_suberror_No_properties_assigned_to_item = 116;
+
+      // Image has no (compressed) data
+      heif_suberror_No_item_data = 117;
+
+      // Invalid specification of image grid (tiled image)
+      heif_suberror_Invalid_grid_data = 118;
+
+      // Tile-images in a grid image are missing
+      heif_suberror_Missing_grid_images = 119;
+      heif_suberror_Invalid_clean_aperture = 120;
+
+      // Invalid specification of overlay image
+      heif_suberror_Invalid_overlay_data = 121;
+
+      // Overlay image completely outside of visible canvas area
+      heif_suberror_Overlay_image_outside_of_canvas = 122;
+      heif_suberror_Auxiliary_image_type_unspecified = 123;
+      heif_suberror_No_or_invalid_primary_item = 124;
+      heif_suberror_No_infe_box = 125;
+      heif_suberror_Unknown_color_profile_type = 126;
+      heif_suberror_Wrong_tile_image_chroma_format = 127;
+      heif_suberror_Invalid_fractional_number = 128;
+      heif_suberror_Invalid_image_size = 129;
+      heif_suberror_Invalid_pixi_box = 130;
+      heif_suberror_No_av1C_box = 131;
+      heif_suberror_Wrong_tile_image_pixel_depth = 132;
+      heif_suberror_Unknown_NCLX_color_primaries = 133;
+      heif_suberror_Unknown_NCLX_transfer_characteristics = 134;
+      heif_suberror_Unknown_NCLX_matrix_coefficients = 135;
+
+      // Invalid specification of region item
+      heif_suberror_Invalid_region_data = 136;
+
+      // Image has no ispe property
+      heif_suberror_No_ispe_property = 137;
+      heif_suberror_Camera_intrinsic_matrix_undefined = 138;
+      heif_suberror_Camera_extrinsic_matrix_undefined = 139;
+
+      // Invalid JPEG 2000 codestream - usually a missing marker
+      heif_suberror_Invalid_J2K_codestream = 140;
+      heif_suberror_No_vvcC_box = 141;
+
+      // icbr is only needed in some situations; this error is for those cases
+      heif_suberror_No_icbr_box = 142;
+      heif_suberror_No_avcC_box = 143;
+
+      // Decompressing generic compression or header compression data failed (e.g. bitstream corruption)
+      heif_suberror_Decompression_invalid_data = 150;
+
+      // --- Memory_allocation_error ---
+
+      // A security limit preventing unreasonable memory allocations was exceeded by the input file.
+      // Please check whether the file is valid. If it is; contact us so that we could increase the
+      // security limits further.
+      heif_suberror_Security_limit_exceeded = 1000;
+
+      // There was an error from the underlying compression / decompression library.
+      // One possibility is lack of resources (e.g. memory).
+      heif_suberror_Compression_initialisation_error = 1001;
+
+      // --- Usage_error ---
+      // An item ID was used that is not present in the file.
+      heif_suberror_Nonexisting_item_referenced = 2000; // also used for Invalid_input
+
+      // An API argument was given a NULL pointer; which is not allowed for that function.
+      heif_suberror_Null_pointer_argument = 2001;
+
+      // Image channel referenced that does not exist in the image
+      heif_suberror_Nonexisting_image_channel_referenced = 2002;
+
+      // The version of the passed plugin is not supported.
+      heif_suberror_Unsupported_plugin_version = 2003;
+
+      // The version of the passed writer is not supported.
+      heif_suberror_Unsupported_writer_version = 2004;
+
+      // The given (encoder) parameter name does not exist.
+      heif_suberror_Unsupported_parameter = 2005;
+
+      // The value for the given parameter is not in the valid range.
+      heif_suberror_Invalid_parameter_value = 2006;
+
+      // Error in property specification
+      heif_suberror_Invalid_property = 2007;
+
+      // Image reference cycle found in iref
+      heif_suberror_Item_reference_cycle = 2008;
+
+      // --- Unsupported_feature ---
+      // Image was coded with an unsupported compression method.
+      heif_suberror_Unsupported_codec = 3000;
+
+      // Image is specified in an unknown way; e.g. as tiled grid image (which is supported)
+      heif_suberror_Unsupported_image_type = 3001;
+      heif_suberror_Unsupported_data_version = 3002;
+
+      // The conversion of the source image to the requested chroma / colorspace is not supported.
+      heif_suberror_Unsupported_color_conversion = 3003;
+      heif_suberror_Unsupported_item_construction_method = 3004;
+      heif_suberror_Unsupported_header_compression_method = 3005;
+
+      // Generically compressed data used an unsupported compression method
+      heif_suberror_Unsupported_generic_compression_method = 3006;
+      heif_suberror_Unsupported_essential_property = 3007;
+
+      // --- Encoder_plugin_error ---
+      heif_suberror_Unsupported_bit_depth = 4000;
+
+      // --- Encoding_error ---
+      heif_suberror_Cannot_write_output_data = 5000;
+      heif_suberror_Encoder_initialization = 5001;
+      heif_suberror_Encoder_encoding = 5002;
+      heif_suberror_Encoder_cleanup = 5003;
+      heif_suberror_Too_many_regions = 5004;
+
+      // --- Plugin loading error ---
+      heif_suberror_Plugin_loading_error = 6000;         // a specific plugin file cannot be loaded
+      heif_suberror_Plugin_is_not_loaded = 6001;         // trying to remove a plugin that is not loaded
+      heif_suberror_Cannot_read_plugin_directory = 6002; // error while scanning the directory for plugins
+      heif_suberror_No_matching_decoder_installed = 6003; // no decoder found for that compression format
+    end;
 
     // Error
     THeifErrorNum = (
-    // Everything ok, no error occurred
-    heif_error_Ok,
-    // Input file does not exist.
-    heif_error_Input_does_not_exist,
-    // Error in input file. Corrupted or invalid content.
-    heif_error_Invalid_input,
-    // Input file type is not supported.
-    heif_error_Unsupported_filetype,
-    // Image requires an unsupported decoder feature.
-    heif_error_Unsupported_feature,
-    // Library API has been used in an invalid way.
-    heif_error_Usage_error,
-    // Could not allocate enough memory.
-    heif_error_Memory_allocation_error,
-    // The decoder plugin generated an error
-    heif_error_Decoder_plugin_error,
-    // The encoder plugin generated an error
-    heif_error_Encoder_plugin_error,
-    // Error during encoding or when writing to the output
-    heif_error_Encoding_error,
-    // Application has asked for a color profile type that does not exist
-    heif_error_Color_profile_does_not_exist,
-    // Error loading a dynamic plugin
-    heif_error_Plugin_loading_error);
+      // Everything ok, no error occurred
+      heif_error_Ok,
+      // Input file does not exist.
+      heif_error_Input_does_not_exist,
+      // Error in input file. Corrupted or invalid content.
+      heif_error_Invalid_input,
+      // Input file type is not supported.
+      heif_error_Unsupported_filetype,
+      // Image requires an unsupported decoder feature.
+      heif_error_Unsupported_feature,
+      // Library API has been used in an invalid way.
+      heif_error_Usage_error,
+      // Could not allocate enough memory.
+      heif_error_Memory_allocation_error,
+      // The decoder plugin generated an error
+      heif_error_Decoder_plugin_error,
+      // The encoder plugin generated an error
+      heif_error_Encoder_plugin_error,
+      // Error during encoding or when writing to the output
+      heif_error_Encoding_error,
+      // Application has asked for a color profile type that does not exist
+      heif_error_Color_profile_does_not_exist,
+      // Error loading a dynamic plugin
+      heif_error_Plugin_loading_error
+    );
 
     heif_filetype_result = (
-    heif_filetype_no,
-    heif_filetype_yes_supported,   // it is heif and can be read by libheif
-    heif_filetype_yes_unsupported, // it is heif, but cannot be read by libheif
-    heif_filetype_maybe); // not sure whether it is an heif, try detection with more input data
+      heif_filetype_no,
+      heif_filetype_yes_supported,   // it is heif and can be read by libheif
+      heif_filetype_yes_unsupported, // it is heif, but cannot be read by libheif
+      heif_filetype_maybe
+    ); // not sure whether it is an heif, try detection with more input data
 
     THeifError = record
       code: THeifErrorNum;
-      subcode: cardinal;
+      subcode: THeifSuberrorCode;
 
       emessage: THeifString;
 
       procedure ErrRaise;
+
+      class function Create(ACode: THeifErrorNum; ASubcode: THeifSuberrorCode=THeifSuberrorCode.heif_suberror_Unspecified; AMessage: THeifString=nil): THeifError; static;
     end;
 
     // Base classes
@@ -148,7 +306,7 @@ uses
     PHeifEncoder = Pointer;
 
     // Procs
-    THeifWriteFunc = function(ctx: PHeifContext; const data: Pointer; size: Cardinal; userdata: Pointer): THeifError of object;
+    THeifWriteFunc = function(const data: Pointer; size: cardinal; userdata: Pointer): THeifError of object;
     PHeifWriteFunc = ^THeifWriteFunc;
 
     // Writer
@@ -184,7 +342,7 @@ var
 
   (* Encoder *)
   heif_encoder_get_name: function (encoder: PHeifEncoder): THeifString; stdcall;
-  heif_encoder_set_lossless: function (encoder: PHeifEncoder; enable: bool): THeifString; stdcall;
+  heif_encoder_set_lossless: function (encoder: PHeifEncoder; enable: bool): THeifError; stdcall;
   // Quality ranges from 0-100
   heif_encoder_set_lossy_quality: function (encoder: PHeifEncoder; quality: integer): THeifError; stdcall;
   heif_encoder_release: function (encoder: PHeifEncoder): THeifString; stdcall;
@@ -217,10 +375,17 @@ var
   heif_get_version_number_minor: function: integer; stdcall;
   heif_get_version_number_maintenance: function: integer; stdcall;
 
-  var
-    FHeifDLL: THandle = 0;
+  function HeifDLLLoaded: boolean;
 
 implementation
+
+var
+  FHeifDLL: THandle = 0;
+
+function HeifDLLLoaded: boolean;
+begin
+  Result := FHeifDLL <> 0;
+end;
 
 function GetProc(Name: string): FARPROC;
 begin
@@ -287,6 +452,16 @@ begin
 end;
 
 { THeifError }
+
+class function THeifError.Create(ACode: THeifErrorNum; ASubcode: THeifSuberrorCode;
+  AMessage: THeifString): THeifError;
+begin
+  with Result do begin
+    code := ACode;
+    subcode := ASubCode;
+    emessage := AMessage;
+  end;
+end;
 
 procedure THeifError.ErrRaise;
 begin

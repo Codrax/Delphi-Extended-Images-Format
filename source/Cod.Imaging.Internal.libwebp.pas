@@ -212,6 +212,8 @@ type
     stats: PWebPAuxStats;
   end;
 
+// DLL
+function WebPDLLLoaded: boolean;
 
 (******************************************************************************
   decode.h
@@ -540,6 +542,11 @@ function WebPEncode(const config: PWebPConfig; const picture: PWebPPicture): Int
 
 implementation
 
+function WebPDLLLoaded: boolean;
+begin
+  Result := true;
+end;
+
 // Internal, version-checked, entry point
 function VP8InitIoInternal(const io: PVP8Io; bersion: Integer): Integer; cdecl; external LIB_WEBP;
 
@@ -576,6 +583,5 @@ function WebPPictureInit(const picture: PWebPPicture): Integer;
 begin
   Result := WebPPictureInitInternal(picture, WEBP_ENCODER_ABI_VERSION);
 end;
-
 
 end.

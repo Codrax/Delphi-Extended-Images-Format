@@ -11,6 +11,9 @@
 {                                                           }
 {***********************************************************}
 
+{$DEFINE UseDelphi}              //Disable fat vcl units(perfect for small apps)
+{$DEFINE RegisterGraphic}        //Registers TPNGObject to use with TPicture
+
 unit Cod.Imaging.WebP;
 
 interface
@@ -126,7 +129,6 @@ begin
       Bit.PixelFormat := pf32bit;
       Bit.Transparent := true;
       Bit.TransparentMode := tmAuto;
-      Bit.SupportsPartialTransparency;
 
       // Allocate
       FreeData;
@@ -152,8 +154,6 @@ begin
 end;
 
 procedure TWebPImage.AssignTo(Dest: TPersistent);
-var
-  Start: PByte;
 begin
   if Dest is TWebPImage then
     (Dest as TWebPImage).AssignWebp( Self )
@@ -464,7 +464,6 @@ end;
 procedure TWebPImage.SetWidth(Value: Integer);
 var
   Previous: PByte;
-  NewSize: cardinal;
   PreviousLibMem: boolean;
 
   PreviousWidth: integer;
@@ -493,4 +492,21 @@ begin
   FreeByteMemory(Previous, PreviousLibMem);
 end;
 
+initialization
+  // Don't register DLL
+  if not WebPDLLLoaded then
+    Exit;
+
+  {Registers THeifImage to use with TPicture}
+  {$IFDEF UseDelphi}{$IFDEF RegisterGraphic}
+    TPicture.RegisterFileFormat('webp', 'Web Picture', TWebPImage);
+  {$ENDIF}{$ENDIF}
+finalization
+  // Don't unregister DLL
+  if not WebPDLLLoaded then
+    Exit;
+
+  {$IFDEF UseDelphi}{$IFDEF RegisterGraphic}
+    TPicture.UnregisterGraphicClass(TWebPImage);
+  {$ENDIF}{$ENDIF}
 end.

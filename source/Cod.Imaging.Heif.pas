@@ -11,6 +11,9 @@
 {                                                           }
 {***********************************************************}
 
+{$DEFINE UseDelphi}              //Disable fat vcl units(perfect for small apps)
+{$DEFINE RegisterGraphic}        //Registers TPNGObject to use with TPicture
+
 unit Cod.Imaging.Heif;
 
 interface
@@ -53,7 +56,7 @@ interface
       function GetScanline(const Index: Integer): Pointer;
 
       {Internal}
-      function DoWrite(ctx: PHeifContext; const data: Pointer; size: Cardinal; userdata: Pointer): THeifError;
+      function DoWrite(const data: Pointer; size: cardinal; userdata: Pointer): THeifError;
 
     protected
       {Empty}
@@ -84,7 +87,7 @@ interface
 
       {Save / Load}
       procedure LoadFromStream(Stream: TStream); override;
-      procedure SaveToStream(Stream: TStream); override; deprecated 'The "callbacker" is not yet properly configured. To be completed';
+      procedure SaveToStream(Stream: TStream); override;
 
       procedure LoadFromFile(const Filename: string); override;
       procedure SaveToFile(const Filename: string); override;
@@ -226,26 +229,25 @@ begin
   inherited;
 end;
 
-function THeifImage.DoWrite(ctx: PHeifContext; const data: Pointer; size: Cardinal;
+function THeifImage.DoWrite(const data: Pointer; size: cardinal;
   userdata: Pointer): THeifError;
 var
-  Reader: Pointer;
-  NewData: PByte;
-  Value: integer;
+  Stream: TStream;
 begin
-  NewData := userdata;
-  Value := NewData^;
+  Stream := TStream(userdata);
 
   // Write
-  Reader := AllocMem(Size);
   try
-    Move(Data, Reader, Size);
-  finally
-    FreeMem(Reader, Size);
+    Stream.Write(Data^, Size);
+  except
+    // Success
+    Result := THeifError.Create(THeifErrorNum.heif_error_Decoder_plugin_error,
+      THeifSuberrorCode.heif_suberror_Unspecified);
+    Exit;
   end;
 
   // Success
-  Result.code := THeifErrorNum.heif_error_Ok;
+  Result := THeifError.Create(THeifErrorNum.heif_error_Ok);
 end;
 
 procedure THeifImage.Draw(ACanvas: TCanvas; const Rect: TRect);
@@ -424,8 +426,6 @@ var
   encoder: PHeifEncoder;
   writer: THeifWriter;
 begin
-  raise Exception.Create('Not supported.'); // to be implemented
-
   // Allocate context
   ctx := heif_context_alloc();
   try
@@ -443,21 +443,10 @@ begin
       heif_encoder_release(encoder);
     end;
 
-    // Make new memory instance
-    var UserData: PByte;
-    UserData := AllocMem(sizeof(byte));
-    try
-      UserData^ := 10;
-
-      writer.writer_api_version := 1;
-      writer.write := DoWrite;
-      heif_context_write(ctx, writer, UserData).ErrRaise;
-    finally
-      FreeMem(UserData, sizeof(byte));
-    end;
-
-    // Write to stream
-    //Stream.Write( Output^, Size );
+    // Start writing process
+    writer.writer_api_version := 1;
+    writer.write := DoWrite;
+    heif_context_write(ctx, writer, Stream).ErrRaise;
   finally
     heif_context_free( ctx );
   end;
@@ -490,7 +479,7 @@ begin
     MoveFlipPixels(@SrcPtr^, @DestPtr^, BytesPerScanLine);
 
     // Next row
-    Inc(SrcPtr, BytesPerScanLine);
+    Inc(SrcPtr, FDataStride);  // move by FDataStride, as some other data is contained!!
   end;
 end;
 
@@ -520,7 +509,7 @@ begin
     ///  channel does not exist, and so It does not need to be set to 255.
 
     // Move
-    Inc(SrcPtr, BytesPerSourceLine);
+    Inc(SrcPtr, FDataStride);  // move by FDataStride, as some other data is contained!!
   end;
 end;
 
@@ -606,4 +595,22 @@ begin
   FreeImageMemory(PreviousImage);
 end;
 
+initialization
+  // Don't register DLL
+  if not HeifDLLLoaded then
+    Exit;
+
+  {Registers THeifImage to use with TPicture}
+  {$IFDEF UseDelphi}{$IFDEF RegisterGraphic}
+    TPicture.RegisterFileFormat('heic', 'High Efficiency Image Codec', THeifImage);
+    TPicture.RegisterFileFormat('heif', 'High Efficiency Image Format', THeifImage);
+  {$ENDIF}{$ENDIF}
+finalization
+  // Don't unregister DLL
+  if not HeifDLLLoaded then
+    Exit;
+
+  {$IFDEF UseDelphi}{$IFDEF RegisterGraphic}
+    TPicture.UnregisterGraphicClass(THeifImage);
+  {$ENDIF}{$ENDIF}
 end.
