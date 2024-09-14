@@ -306,7 +306,7 @@ uses
     PHeifEncoder = Pointer;
 
     // Procs
-    THeifWriteFunc = function(const data: Pointer; size: cardinal; userdata: Pointer): THeifError of object;
+    THeifWriteFunc = function(ctx: PHeifContext; const data: Pointer; size: cardinal; userdata: Pointer): THeifError;
     PHeifWriteFunc = ^THeifWriteFunc;
 
     // Writer

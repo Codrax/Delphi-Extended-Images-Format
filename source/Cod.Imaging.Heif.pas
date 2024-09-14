@@ -56,7 +56,7 @@ interface
       function GetScanline(const Index: Integer): Pointer;
 
       {Internal}
-      function DoWrite(const data: Pointer; size: cardinal; userdata: Pointer): THeifError;
+      class function DoWrite(ctx: PHeifContext; const data: Pointer; size: cardinal; userdata: Pointer): THeifError; static;
 
     protected
       {Empty}
@@ -229,7 +229,7 @@ begin
   inherited;
 end;
 
-function THeifImage.DoWrite(const data: Pointer; size: cardinal;
+class function THeifImage.DoWrite(ctx: PHeifContext; const data: Pointer; size: cardinal;
   userdata: Pointer): THeifError;
 var
   Stream: TStream;
