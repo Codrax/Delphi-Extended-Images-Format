@@ -26,7 +26,7 @@ These units add two new `TGraphic` class types called `THeifImage` and `TWebPIma
     Image1.Picture.Graphic := Image;
   finally
     Image.Free;
-  end;****
+  end;
 ```
 Cross conversion example
 ```
