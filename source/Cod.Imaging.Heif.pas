@@ -92,6 +92,12 @@ interface
       procedure LoadFromFile(const Filename: string); override;
       procedure SaveToFile(const Filename: string); override;
 
+      {Clipboard}
+      procedure LoadFromClipboardFormat(AFormat: Word; AData: THandle;
+        APalette: HPALETTE); override;
+      procedure SaveToClipboardFormat(var AFormat: Word; var AData: THandle;
+        var APalette: HPALETTE); override;
+
       {Save quality level}
       property Quality: byte read FQuality write SetQuality;
       property LosslessQuality: boolean read FLosslessQuality write FLosslessQuality;
@@ -324,6 +330,13 @@ begin
   Result := heif_image_get_width(FImage, HEIF_CHANNEL);
 end;
 
+procedure THeifImage.LoadFromClipboardFormat(AFormat: Word; AData: THandle;
+  APalette: HPALETTE);
+begin
+  inherited;
+  raise Exception.Create('Not supported.');
+end;
+
 procedure THeifImage.LoadFromFile(const Filename: string);
 var
   ctx: PHeifContext;
@@ -395,6 +408,13 @@ begin
 
   // Get Interleaved plane
   FData := heif_image_get_plane(FImage, THeifChannel.channel_interleaved, FDataStride);
+end;
+
+procedure THeifImage.SaveToClipboardFormat(var AFormat: Word;
+  var AData: THandle; var APalette: HPALETTE);
+begin
+  inherited;
+  raise Exception.Create('Not supported.');
 end;
 
 procedure THeifImage.SaveToFile(const Filename: string);

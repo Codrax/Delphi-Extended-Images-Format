@@ -83,6 +83,12 @@ interface
       procedure LoadFromStream(Stream: TStream); override;
       procedure SaveToStream(Stream: TStream); override;
 
+      {Clipboard}
+      procedure LoadFromClipboardFormat(AFormat: Word; AData: THandle;
+        APalette: HPALETTE); override;
+      procedure SaveToClipboardFormat(var AFormat: Word; var AData: THandle;
+        var APalette: HPALETTE); override;
+
       {Save quality level}
       property Quality: single read FQuality write SetQuality;
 
@@ -300,6 +306,13 @@ begin
   Result := FWidth;
 end;
 
+procedure TWebPImage.LoadFromClipboardFormat(AFormat: Word; AData: THandle;
+  APalette: HPALETTE);
+begin
+  inherited;
+  raise Exception.Create('Not supported.');
+end;
+
 procedure TWebPImage.LoadFromStream(Stream: TStream);
 var
   Buffer: TBytes;
@@ -323,6 +336,13 @@ begin
   Result := ArraySize;
   FData := AllocMem(Result);
   FLibMem := false;
+end;
+
+procedure TWebPImage.SaveToClipboardFormat(var AFormat: Word;
+  var AData: THandle; var APalette: HPALETTE);
+begin
+  inherited;
+  raise Exception.Create('Not supported.');
 end;
 
 procedure TWebPImage.SaveToStream(Stream: TStream);
