@@ -42,6 +42,10 @@ interface
       // Convert
       function ToColor: TColor;
       function ToString: string;
+
+      // Write utils
+      procedure WriteTo(R, G, B, A: PByte); overload;
+      procedure WriteTo(var R, G, B, A: Byte); overload;
     end;
 
 const
@@ -119,6 +123,21 @@ end;
 function TRGBAPixelHelper.ToString: string;
 begin
   Result := '#' + IntToHex(Self, 8);
+end;
+
+procedure TRGBAPixelHelper.WriteTo(var R, G, B, A: Byte);
+begin
+  WriteTo(@R, @G, @B, @A);
+end;
+
+procedure TRGBAPixelHelper.WriteTo(R, G, B, A: PByte);
+begin
+  if R <> nil then
+    R^ := GetR;
+  if G <> nil then
+    G^ := GetG;
+  if B <> nil then
+    B^ := GetB;
 end;
 
 end.

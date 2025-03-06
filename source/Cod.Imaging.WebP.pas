@@ -31,8 +31,10 @@ interface
       FWidth,
       FHeight: integer;
       FQuality: single; // the save quality
-      FChannelNumber: byte;
+      FColorSpace: WEBP_CSP_MODE;
+      FPixelByteSize: integer;
       FLibMem: boolean;
+      FLossless: boolean;
 
       {Free mem}
       procedure FreeData;
@@ -95,6 +97,8 @@ interface
       {Access to the png pixels}
       property Pixels[const X, Y: Integer]: TColor read GetPixels write SetPixels;
       property WebPPixels[const X, Y: Integer]: TRGBAPixel read GetWebPPixel write SetWebPPixel;
+      property ColorSpace: WEBP_CSP_MODE read FColorSpace write FColorSpace;
+      property Lossless: boolean read FLossless write FLossless;
 
       constructor Create; override;
       constructor CreateBlank(Width, Height: integer);
@@ -105,6 +109,9 @@ interface
 
 implementation
 
+const
+  E_UNSUPORTED_COLORSPACE = 'Unsupported colorspace.';
+
 function GetLibraryVersion: string;
 begin
   Result := GetWebpVersionString(WebPGetEncoderVersion);
@@ -114,7 +121,7 @@ end;
 
 function TWebPImage.ArraySize: cardinal;
 begin
-  Result := FWidth * FHeight * FChannelNumber;
+  Result := FWidth * FHeight * FPixelByteSize;
 end;
 
 procedure TWebPImage.Assign(Source: TPersistent);
@@ -128,13 +135,27 @@ begin
   if Source is TWebPImage then
     AssignWebp(Source as TWebPImage)
   else begin
-    const Bit = TBitMap.Create;
+    var Bit: TBitMap; Bit := TBitMap.Create;
     try
       // Create
       Bit.Assign(Source);
-      Bit.PixelFormat := pf32bit;
-      Bit.Transparent := true;
-      Bit.TransparentMode := tmAuto;
+
+      // Pixel format
+      case Bit.PixelFormat of
+        pf24bit: begin
+          FColorSpace := MODE_BGR;
+          FPixelByteSize := 3;
+        end;
+        pf32bit: begin
+          FColorSpace := MODE_BGRA;
+          FPixelByteSize := 4;
+
+          Bit.Transparent := true;
+          Bit.TransparentMode := tmAuto;
+        end;
+
+        else raise Exception.Create('Pixel format not supported.');
+      end;
 
       // Allocate
       FreeData;
@@ -144,7 +165,8 @@ begin
 
       // Read
       DestPtr := FData;
-      BytesPerScanLine := Bit.Width * 4;
+
+      BytesPerScanLine := Bit.Width * FPixelByteSize;
 
       // Copy picture lines
       for Y := 0 to Bit.Height - 1 do begin
@@ -191,7 +213,8 @@ begin
     // Read settings
     FWidth := Source.FWidth;
     FHeight := Source.FHeight;
-    FChannelNumber := Source.FChannelNumber;
+    FPixelByteSize := Source.FPixelByteSize;
+    FColorSpace := Source.ColorSpace;
     FQuality := Source.FQuality;
 
     // Clone memory
@@ -207,7 +230,10 @@ begin
   inherited;
   FData := nil;
   FQuality := DEFAULT_QUALITY;
-  FChannelNumber := 4; {B G R A}
+  Lossless := false;
+  
+  FColorSpace := WEBP_CSP_MODE.MODE_BGRA;
+  FPixelByteSize := 4; {B G R A}
 end;
 
 constructor TWebPImage.CreateBlank(Width, Height: integer);
@@ -276,21 +302,18 @@ begin
 end;
 
 function TWebPImage.GetPixels(const X, Y: Integer): TColor;
-var
-  Start: integer;
 begin
-  Start := GetPixelStart(X, Y);
-  Result := RGB(FData[Start+2], FData[Start+1], FData[Start]);
+  Result := GetWebPPixel(X, Y).ToColor;
 end;
 
 function TWebPImage.GetPixelStart(X, Y: Integer): cardinal;
 begin
-  Result := (X+FWidth*Y)*FChannelNumber;
+  Result := (X+FWidth*Y)*FPixelByteSize;
 end;
 
 function TWebPImage.GetScanline(const Index: Integer): Pointer;
 begin
-  Result := @FData[FWidth*Index*FChannelNumber];
+  Result := @FData[FWidth*Index*FPixelByteSize];
 end;
 
 function TWebPImage.GetWebPPixel(const X, Y: Integer): TRGBAPixel;
@@ -298,7 +321,15 @@ var
   Start: integer;
 begin
   Start := GetPixelStart(X, Y);
-  Result := TRGBAPixel.Create(FData[Start+2], FData[Start+1], FData[Start], FData[Start+3]);
+  case FColorSpace of
+    MODE_RGB: Result := TRGBAPixel.Create(FData[Start], FData[Start+1], FData[Start+2], 255);
+    MODE_RGBA: Result := TRGBAPixel.Create(FData[Start], FData[Start+1], FData[Start+2], FData[Start+3]);
+    MODE_BGR: Result := TRGBAPixel.Create(FData[Start+2], FData[Start+1], FData[Start], 255);
+    MODE_BGRA: Result := TRGBAPixel.Create(FData[Start+2], FData[Start+1], FData[Start], FData[Start+3]);
+    //MODE_YUV: ;
+
+    else raise Exception.Create(E_UNSUPORTED_COLORSPACE);
+  end;
 end;
 
 function TWebPImage.GetWidth: Integer;
@@ -324,7 +355,27 @@ begin
 
   try
     // Decode
-    FData := WebPDecodeBGRA(@Buffer[0], Stream.Size, @FWidth, @FHeight);
+    case FColorSpace of
+      MODE_RGB: begin
+        FPixelByteSize := 3;
+        FData := WebPDecodeRGB(@Buffer[0], Stream.Size, @FWidth, @FHeight);
+      end;
+      MODE_RGBA: begin
+        FPixelByteSize := 4;
+        FData := WebPDecodeRGBA(@Buffer[0], Stream.Size, @FWidth, @FHeight);
+      end;
+      MODE_BGR: begin
+        FPixelByteSize := 3;
+        FData := WebPDecodeBGRA(@Buffer[0], Stream.Size, @FWidth, @FHeight);
+      end;
+      MODE_BGRA: begin
+        FPixelByteSize := 4;
+        FData := WebPDecodeBGRA(@Buffer[0], Stream.Size, @FWidth, @FHeight);
+      end;
+      //MODE_YUV: ;
+      
+      else raise Exception.Create(E_UNSUPORTED_COLORSPACE);
+    end;
     FLibMem := true;
   finally
     SetLength(Buffer, 0);
@@ -350,7 +401,27 @@ var
   Output: PByte;
   Size: cardinal;
 begin
-  Size := WebPEncodeBGRA(FData, FWidth, FHeight, FWidth*FChannelNumber, Quality, Output);
+  case FColorSpace of
+    MODE_RGB: if Lossless then
+      Size := WebPEncodeLosslessRGB(FData, FWidth, FHeight, FWidth*FPixelByteSize, Output)
+    else
+      Size := WebPEncodeRGB(FData, FWidth, FHeight, FWidth*FPixelByteSize, Quality, Output);
+    MODE_RGBA: if Lossless then 
+      Size := WebPEncodeLosslessRGBA(FData, FWidth, FHeight, FWidth*FPixelByteSize, Output)
+    else
+      Size := WebPEncodeRGBA(FData, FWidth, FHeight, FWidth*FPixelByteSize, Quality, Output);
+    MODE_BGR: if Lossless then 
+      Size := WebPEncodeLosslessBGR(FData, FWidth, FHeight, FWidth*FPixelByteSize, Output)
+    else
+      Size := WebPEncodeBGR(FData, FWidth, FHeight, FWidth*FPixelByteSize, Quality, Output);
+    MODE_BGRA: if Lossless then 
+      Size := WebPEncodeLosslessBGRA(FData, FWidth, FHeight, FWidth*FPixelByteSize, Output)
+    else
+      Size := WebPEncodeBGRA(FData, FWidth, FHeight, FWidth*FPixelByteSize, Quality, Output);
+    //MODE_YUV: 
+    
+    else raise Exception.Create(E_UNSUPORTED_COLORSPACE);
+  end;
 
   Stream.Write( Output^, Size );
 end;
@@ -364,14 +435,27 @@ var
 begin
   Result := TBitmap.Create;
 
-  Result.PixelFormat := pf32bit;
+  case FColorSpace of
+    //MODE_RGB: ;
+    //MODE_RGBA: ;
+    MODE_BGR: begin
+      Result.PixelFormat := pf24bit;
+    end;
+    MODE_BGRA: begin
+      Result.PixelFormat := pf32bit;
+      Result.Transparent := true;
+      Result.TransparentMode := tmAuto;
+    end;
+    //MODE_YUV: ;
+
+    else raise Exception.Create(E_UNSUPORTED_COLORSPACE);
+  end;
+  
   Result.Width := FWidth;
   Result.Height := FHeight;
-  Result.Transparent := true;
-  Result.TransparentMode := tmAuto;
 
   SrcPtr := FData;
-  BytesPerScanLine := FWidth * FChannelNumber;
+  BytesPerScanLine := FWidth * FPixelByteSize;
 
   for Y := 0 to FHeight - 1 do
   begin
@@ -384,24 +468,42 @@ end;
 function TWebPImage.ScanCreatePNG: TPNGImage;
 const
   RGB_SIZE = 3;
+  RGBA_SIZE = 4;
 var
-  RGBA_SIZE: integer;
+  PixelMemSize: integer;
   X, Y: Integer;
   AlphPtr: PByteArray;
   SrcPtr,
   DestPtr,
   Cursor: PByte;
   BytesPerSourceLine: integer;
+  CopyStandedAlpha: boolean;
 begin
-  // Initialize byte size
-  RGBA_SIZE := FChannelNumber;
+  if (Width = 0) or (Height = 0) then
+    Exit( TPNGImage.Create );
 
   // Create
-  Result := TPNGImage.CreateBlank(COLOR_RGBALPHA, RGBA_SIZE * 2, FWidth, FHeight);
+  case FColorSpace of
+    //MODE_RGB: ;
+    //MODE_RGBA: ;
+    MODE_BGR: begin
+      PixelMemSize := 3;
+      Result := TPNGImage.CreateBlank(COLOR_RGB, RGBA_SIZE * 2, FWidth, FHeight);
+      CopyStandedAlpha := false;
+    end;
+    MODE_BGRA: begin
+      PixelMemSize := 4;
+      Result := TPNGImage.CreateBlank(COLOR_RGBALPHA, RGBA_SIZE * 2, FWidth, FHeight);
+      CopyStandedAlpha := true;
+    end;
+    //MODE_YUV: ;
+
+    else raise Exception.Create(E_UNSUPORTED_COLORSPACE);
+  end;
 
   // Calcualte byte size
   SrcPtr := FData;
-  BytesPerSourceLine := FWidth * RGBA_SIZE;
+  BytesPerSourceLine := FWidth * PixelMemSize;
 
   for Y := 0 to FHeight - 1 do
   begin
@@ -412,13 +514,14 @@ begin
     Cursor := SrcPtr;
     for X := 0 to FWidth-1 do begin
       // Read alpha
-      Move(Cursor^, DestPtr^, 3);
+      Move(Cursor^, DestPtr^, RGB_SIZE);
 
-      AlphPtr[X] := Cursor[3];
+      if CopyStandedAlpha then
+        AlphPtr[X] := Cursor[3];
 
       // Move
-      Inc(Cursor, RGBA_SIZE);
-      Inc(DestPtr, RGB_SIZE);
+      Inc(Cursor, PixelMemSize);
+      Inc(DestPtr, RGB_SIZE); // this is always 3!! The Alpha Channel is separate
     end;
 
     // Move
@@ -452,16 +555,8 @@ begin
 end;
 
 procedure TWebPImage.SetPixels(const X, Y: Integer; const Value: TColor);
-var
-  Start: integer;
 begin
-  Start := GetPixelStart(X, Y);
-
-  FData[Start+3] := 255;
-
-  FData[Start+2] := GetRValue(Value);
-  FData[Start+1] := GetGValue(Value);
-  FData[Start] := GetBValue(Value);
+  SetWebPPixel(X, Y, TRGBAPixel.Create(Value));
 end;
 
 procedure TWebPImage.SetQuality(const Value: single);
@@ -475,10 +570,15 @@ var
 begin
   Start := GetPixelStart(X, Y);
 
-  FData[Start+2] := Value.GetR;
-  FData[Start+1] := Value.GetG;
-  FData[Start] := Value.GetB;
-  FData[Start+3] := Value.GetAlpha;
+  case FColorSpace of
+    MODE_RGB: Value.WriteTo(@FData[Start], @FData[Start+1], @FData[Start+2], nil);
+    MODE_RGBA: Value.WriteTo(FData[Start], FData[Start+1], FData[Start+2], FData[Start+3]);
+    MODE_BGR: Value.WriteTo(@FData[Start+2], @FData[Start+1], @FData[Start], nil);
+    MODE_BGRA: Value.WriteTo(FData[Start+2], FData[Start+1], FData[Start], FData[Start+3]);
+    //MODE_YUV: ;
+
+    else raise Exception.Create(E_UNSUPORTED_COLORSPACE);
+  end;
 end;
 
 procedure TWebPImage.SetWidth(Value: Integer);
@@ -501,10 +601,10 @@ begin
   ReallocateMemory;
 
   // Transfer bytes
-  const MemoryRead = Min(PreviousWidth, FWidth) * FChannelNumber;
+  const MemoryRead = Min(PreviousWidth, FWidth) * FPixelByteSize;
   for var I := 0 to FHeight-1 do begin
-    Move(Previous[I * PreviousWidth * FChannelNumber],
-         FData[I * FWidth * FChannelNumber],
+    Move(Previous[I * PreviousWidth * FPixelByteSize],
+         FData[I * FWidth * FPixelByteSize],
          MemoryRead);
   end;
 

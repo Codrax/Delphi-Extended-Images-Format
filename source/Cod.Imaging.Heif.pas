@@ -133,6 +133,9 @@ begin
 end;
 
 procedure THeifImage.Assign(Source: TPersistent);
+const
+  RGB_SIZE = 3;
+  RGBA_SIZE = 4;
 var
   Y: integer;
   SrcPtr: PByte;
@@ -147,10 +150,6 @@ begin
     try
       // Create
       Bit.Assign(Source);
-      Bit.PixelFormat := pf24bit;
-      Bit.Transparent := true;
-      Bit.TransparentMode := tmAuto;
-      Bit.SupportsPartialTransparency;
 
       // Free previous
       FreeData;
@@ -160,17 +159,44 @@ begin
 
       // Read
       DestPtr := FData;
-      BytesPerScanLine := Bit.Width * 3;
+      BytesPerScanLine := Bit.Width * RGB_SIZE;
 
-      // Copy picture lines
-      for Y := 0 to Bit.Height - 1 do begin
-        SrcPtr := Bit.ScanLine[Y];
+      // Pixel format
+      case Bit.PixelFormat of
+        pf24bit: begin
+          // Copy picture lines
+          for Y := 0 to Bit.Height - 1 do begin
+            SrcPtr := Bit.ScanLine[Y];
 
-        // Copy
-        MoveFlipPixels(SrcPtr, DestPtr, BytesPerScanLine);
+            // Copy
+            MoveFlipPixels(SrcPtr, DestPtr, BytesPerScanLine);
 
-        // Inc pos
-        Inc(DestPtr, BytesPerScanLine);
+            // Inc pos
+            Inc(DestPtr, BytesPerScanLine);
+          end;
+        end;
+        pf32bit: begin
+          Bit.SaveToFile('C:\Users\Codrut\Downloads\what.heif');
+
+          // Copy picture lines
+          for Y := 0 to Bit.Height - 1 do begin
+            SrcPtr := Bit.ScanLine[Y];
+
+            // Copy
+            for var X := 0 to Bit.Width do begin
+              DestPtr[X*RGB_SIZE] := SrcPtr[2];
+              DestPtr[X*RGB_SIZE+1] := SrcPtr[1];
+              DestPtr[X*RGB_SIZE+2] := SrcPtr[0];
+
+              Inc(SrcPtr, RGBA_SIZE);
+            end;
+
+            // Inc pos
+            Inc(DestPtr, FDataStride);
+          end;
+        end;
+
+        else raise Exception.Create('Pixel format not supported.');
       end;
     finally
       Bit.Free;
@@ -298,16 +324,13 @@ begin
 end;
 
 function THeifImage.GetPixels(const X, Y: Integer): TColor;
-var
-  Start: integer;
 begin
-  Start := GetPixelStart(X, Y);
-  Result := RGB(FData[Start+2], FData[Start+1], FData[Start]);
+  Result := GetWebPPixel(X, Y).ToColor;
 end;
 
 function THeifImage.GetPixelStart(X, Y: Integer): cardinal;
 begin
-  Result := (X+GetWidth*Y)*PIXEL_SIZE;
+  Result := Y*FDataStride + X*PIXEL_SIZE;
 end;
 
 function THeifImage.GetScanline(const Index: Integer): Pointer;
@@ -320,7 +343,7 @@ var
   Start: integer;
 begin
   Start := GetPixelStart(X, Y);
-  Result := TRGBAPixel.Create(FData[Start+2], FData[Start+1], FData[Start], FData[Start+3]);
+  Result := TRGBAPixel.Create(FData[Start], FData[Start+1], FData[Start+2]);
 end;
 
 function THeifImage.GetWidth: Integer;
@@ -510,6 +533,9 @@ var
   DestPtr: PByte;
   BytesPerSourceLine: integer;
 begin
+  if (Width = 0) or (Height = 0) then
+    Exit( TPNGImage.Create );
+
   Result := TPNGImage.CreateBlank(COLOR_RGB, 8, Width, Height);
   Result.Transparent := false;
 
@@ -525,8 +551,9 @@ begin
     // Read
     MoveFlipPixels(@SrcPtr^, @DestPtr^, BytesPerSourceLine);
 
-    ///  Since the PNG image is COLOR_RGB, not COLOR_RGBALPHA, the Alpha
+    ///  Since the PNG image is COLOR_RGB, not COLOR_BRGALPHA, the Alpha
     ///  channel does not exist, and so It does not need to be set to 255.
+    ///  Also, they are in reverse order, so this function is needed
 
     // Move
     Inc(SrcPtr, FDataStride);  // move by FDataStride, as some other data is contained!!
@@ -557,16 +584,8 @@ begin
 end;
 
 procedure THeifImage.SetPixels(const X, Y: Integer; const Value: TColor);
-var
-  Start: integer;
 begin
-  Start := GetPixelStart(X, Y);
-
-  FData[Start+3] := 255;
-
-  FData[Start+2] := GetRValue(Value);
-  FData[Start+1] := GetGValue(Value);
-  FData[Start] := GetBValue(Value);
+  SetWebPPixel(X, Y, TRGBAPixel.Create(Value));
 end;
 
 procedure THeifImage.SetQuality(const Value: byte);
@@ -580,10 +599,9 @@ var
 begin
   Start := GetPixelStart(X, Y);
 
-  FData[Start+2] := Value.GetR;
+  FData[Start] := Value.GetR;
   FData[Start+1] := Value.GetG;
-  FData[Start] := Value.GetB;
-  FData[Start+3] := Value.GetAlpha;
+  FData[Start+2] := Value.GetB;
 end;
 
 procedure THeifImage.SetWidth(Value: Integer);

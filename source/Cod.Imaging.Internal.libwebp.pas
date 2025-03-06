@@ -68,6 +68,20 @@ type
     external_buffer: Integer;   // If true, the output buffers are externally owned
   end;
 
+  PWebPBitstreamFeatures = ^TWebPBitstreamFeatures;
+  TWebPBitstreamFeatures = record
+    width: Integer;
+    height: Integer;
+    has_alpha: Integer;      // 1 = Image has transparency
+
+    bitstream_version: Integer;
+    no_incremental_decoding: Integer;  // 1 = Image is animated
+
+    rotate: Integer;
+    uv_sampling: integer;
+    Pad: array[0..2] of Cardinal;
+  end;
+
   PWebPIDecoder = ^TWebPIDecoder;
   TWebPIDecoder = record
     state_: TDecState;         // current decoding state
@@ -402,6 +416,9 @@ function WebPIDecGetYUV(const idec: PWebPIDecoder; last_y: PInteger;
 // Create a new decoder object.
 function VP8New: PWebPIDecoder; cdecl; external LIB_WEBP;
 
+function WebPGetFeatures(const data: PByte; data_size: Cardinal; features: PWebPBitstreamFeatures): TVP8StatusCode;
+function WebPGetFeaturesInternal(const data: PByte; data_size: Cardinal; features: PWebPBitstreamFeatures; version: Integer): TVP8StatusCode; cdecl; external LIB_WEBP;
+
 // Must be called to make sure 'io' is initialized properly.
 // Returns false in case of version mismatch. Upon such failure, no other
 // decoding function should be called (VP8Decode, VP8GetHeaders, ...)
@@ -552,6 +569,11 @@ function VP8InitIoInternal(const io: PVP8Io; bersion: Integer): Integer; cdecl; 
 
 const
   WEBP_DECODER_ABI_VERSION = $0001;
+
+function WebPGetFeatures(const data: PByte; data_size: Cardinal; features: PWebPBitstreamFeatures): TVP8StatusCode;
+begin
+  Result := WebPGetFeaturesInternal(data, data_size, features, WEBP_DECODER_ABI_VERSION);
+end;
 
 function VP8InitIo(const io: PVP8Io): Integer;
 begin
